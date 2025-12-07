@@ -1,0 +1,63 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  PACKAGE: ssl-pinning
+  PROJECT: ssl-pinning
+  BUILD_DEST: build/package
+  CI: '{{ .CI | default "" }}'
+  GIT_COMMIT:
+    sh: git log -n 1 --format=%h 2>/dev/null || echo "dev"
+  GIT_BRANCH:
+    sh: git describe --tags --always 2>/dev/null || echo "v0.0.0"
+  TIME:
+    sh: date +%s
+  VERSION: '{{ if ne .CI "" }}{{ .GIT_BRANCH }}-{{ .GIT_COMMIT }}{{ else }}{{ .TIME }}{{ end }}'
+  GOOS: '{{ if ne .CI "" }}linux{{ else }}{{ .GOOS }}{{ end }}'
+
+tasks:
+  default:
+    deps: [build]
+    cmds:
+      - "{{ .BUILD_DEST }}/usr/local/sbin/{{ .PACKAGE }} {{ .args }}"
+
+  build:
+    desc: Build cmd {{ .PACKAGE }}
+    env:
+      GOOS: "{{ .GOOS }}"
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+      GO111MODULE: "on"
+    vars:
+      LDFLAGS: >-
+        -X {{ .PROJECT }}/internal/version.version={{ .VERSION }}
+        -X {{ .PROJECT }}/internal/version.gitCommit={{ .GIT_COMMIT }}
+    deps:
+      - task: cleanup-bin
+    cmds:
+      - cmd: >
+          go build -o {{ .BUILD_DEST }}/usr/local/sbin/{{ .PACKAGE }}
+          -ldflags "-w -s {{ .LDFLAGS }}"
+          {{ .PACKAGE }}
+    sources:
+      - ./**/*.yaml
+      - ./**/*.go
+
+  cleanup-bin:
+    cmds:
+      - cmd: rm -rf {{ .BUILD_DEST }}/usr/local/sbin/{{ .PACKAGE }}
+
+  generate-keys:
+    desc: Generate signing keys for use in the {{ .PACKAGE }}
+    cmds:
+      - cmd: >-
+          openssl genpkey
+          -algorithm RSA
+          -pkeyopt rsa_keygen_bits:4096
+          -out {{ .BUILD_DEST }}/etc/{{ .PACKAGE }}/tls/prv.pem
+      - cmd: >-
+          openssl rsa
+          -pubout
+          -in {{ .BUILD_DEST }}/etc/{{ .PACKAGE }}/tls/prv.pem
+          -out {{ .BUILD_DEST }}/etc/{{ .PACKAGE }}/tls/pub.pem

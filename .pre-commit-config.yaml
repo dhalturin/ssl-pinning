@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: govulncheck
+        name: Run govulncheck
+        entry: govulncheck ./...
+        language: system
+        always_run: false
+        pass_filenames: false
+        files: \.go$
+
+      - id: gotest
+        name: Run go test
+        entry: go test ./...
+        language: system
+        always_run: false
+        pass_filenames: false
+        files: \.go$
