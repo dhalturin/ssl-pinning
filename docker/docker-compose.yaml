@@ -1,0 +1,82 @@
+services:
+  ssl-pinning:
+    container_name: ssl-pinning
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    environment:
+      SSL_PINNING_SERVER_LISTEN: 0.0.0.0:7500
+      SSL_PINNING_SERVER_READ_TIMEOUT: 5s
+      SSL_PINNING_SERVER_WRITE_TIMEOUT: 5s
+
+      SSL_PINNING_STORAGE_TYPE: redis
+      SSL_PINNING_STORAGE_DSN: redis://valkey:6379/0?maintnotifications=disabled
+      SSL_PINNING_STORAGE_DUMP_DIR: /opt/ssl-pinning/storage-dump
+
+      SSL_PINNING_STORAGE_MAX_IDLE_CONNS: 5
+      SSL_PINNING_STORAGE_MAX_OPEN_CONNS: 5
+      SSL_PINNING_STORAGE_CONN_MAX_IDLE_TIME: 5m
+      SSL_PINNING_STORAGE_CONN_MAX_LIFETIME: 30m
+
+      SSL_PINNING_TLS_DIR: /opt/ssl-pinning/tls
+      SSL_PINNING_TLS_DUMP_INTERVAL: 1s
+      SSL_PINNING_TLS_TIMEOUT: 3s
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        [ -f /opt/ssl-pinning/tls/prv.pem ] || (
+          apk add --no-cache openssl
+          mkdir -p /opt/ssl-pinning/tls
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out /opt/ssl-pinning/tls/prv.pem
+          openssl rsa -pubout -in /opt/ssl-pinning/tls/prv.pem -out /opt/ssl-pinning/tls/pub.pem        
+        )
+        /usr/local/sbin/ssl-pinning up
+    ports:
+      - 7500:7500
+    volumes:
+      - ssl_pinning_data:/opt/ssl-pinning
+    depends_on:
+      valkey:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:9.0.0
+    container_name: valkey
+    ports:
+      - "6379:6379"
+    command: >
+      valkey-server
+      --appendonly yes
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ssl_pinning
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "postgres", "-U", "app", "-d", "ssl_pinning"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ssl_pinning_data:
+  valkey_data:
+  postgres_data:

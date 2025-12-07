@@ -1,0 +1,6 @@
+.env
+.task
+build/package/etc/ssl-pinning/config.yaml
+build/package/etc/ssl-pinning/tls/*.pem
+build/package/usr
+build/package/tmp

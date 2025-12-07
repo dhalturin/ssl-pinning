@@ -1,0 +1,24 @@
+name: Release please
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      # - 'CHANGELOG.md'
+      - 'docs/**'
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          release-type: go
+          token: ${{ secrets.RELEASE_SSL_PINNING }}
