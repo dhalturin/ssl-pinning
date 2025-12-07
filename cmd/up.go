@@ -60,6 +60,8 @@ var upCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(upCmd)
 
+	// test
+
 	upCmd.Flags().Duration("storage-conn-max-idle-time", 5*time.Minute, "Max idle time of storage connections")
 	upCmd.Flags().Duration("storage-conn-max-lifetime", 30*time.Minute, "Max lifetime of storage connections")
 	upCmd.Flags().Duration("tls-dump-interval", 5*time.Second, "Dump interval keys to storage")
